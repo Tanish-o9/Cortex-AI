@@ -1,0 +1,103 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Cortex AI Enterprise API Specification",
+    "version": "1.0.0",
+    "description": "API documentation for visual workflows, RBAC organizations, teams, and human approval gateways."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8000",
+      "description": "API Gateway Entrypoint"
+    }
+  ],
+  "paths": {
+    "/api/auth/organizations": {
+      "post": {
+        "summary": "Create Organization",
+        "description": "Registers a new tenant organization in PostgreSQL, assigning the creator as the Owner.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "example": "Acme Corp" }
+                },
+                "required": ["name"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Organization created successfully"
+          }
+        }
+      }
+    },
+    "/api/auth/teams": {
+      "post": {
+        "summary": "Create Team",
+        "description": "Registers a team within an organization. Requires Admin permission.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "example": "Engineering" },
+                  "organizationId": { "type": "integer", "example": 1 }
+                },
+                "required": ["name", "organizationId"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Team created" }
+        }
+      }
+    },
+    "/api/agent/workflows": {
+      "post": {
+        "summary": "Save Visual Workflow",
+        "description": "Saves a Visual Workflow DAG configuration in MongoDB.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": { "type": "string", "example": "Translation Pipeline" },
+                  "description": { "type": "string", "example": "Translate prompts" },
+                  "nodes": { "type": "array", "items": { "type": "object" } },
+                  "edges": { "type": "array", "items": { "type": "object" } }
+                },
+                "required": ["name", "nodes", "edges"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": { "description": "Workflow saved" }
+        }
+      }
+    },
+    "/api/agent/workflows/{id}/execute": {
+      "post": {
+        "summary": "Trigger Workflow Execution",
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "string" } }
+        ],
+        "responses": {
+          "200": { "description": "Workflow completed" },
+          "202": { "description": "Suspended, waiting for human approval" }
+        }
+      }
+    }
+  }
+}

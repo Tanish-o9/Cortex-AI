@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Send, Paperclip,  Square, Zap, MessageSquare, Code2, Presentation, Image as ImageIcon, Globe, FileText,X } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
-import { addMessage, setArtifacts, setIsLoading } from "../redux/message.slice";
+import { addMessage, appendMessageChunk, setArtifacts, setIsLoading } from "../redux/message.slice";
 import { sendPrompt } from "../features/agent.api";
 import { Mic, MicOff } from "lucide-react";
 import { useEffect } from "react";
@@ -192,56 +192,82 @@ const toggleMic = () => {
         dispatch(setConvTitle({ conversationId: conversation._id, title: prompt.slice(0, 40) }));
       }
 
-      dispatch(addMessage({ role: "user", content: prompt }));
       setValue("");
 
-      const formData = new FormData();
+      if (selectedFile) {
+        dispatch(addMessage({ role: "user", content: prompt }));
+        const formData = new FormData();
+        formData.append("conversationId", conversation._id);
+        formData.append("prompt", prompt);
+        formData.append("agent", selectedAgent);
+        formData.append("file", selectedFile);
+        setSelectedFile(null);
 
-formData.append(
-    "conversationId",
-    conversation._id
-);
+        const data = await sendPrompt(formData);
+        dispatch(
+          addMessage({
+            role: "assistant",
+            content: data.answer,
+            images: data.images
+          })
+        );
+        if (data.artifacts) {
+          dispatch(setArtifacts(data.artifacts));
+        }
+      } else {
+        dispatch(addMessage({ role: "user", content: prompt }));
+        dispatch(addMessage({ role: "assistant", content: "" }));
 
-formData.append(
-    "prompt",
-    prompt
-);
+        const serverUrl = import.meta.env.VITE_SERVER_URL || "";
+        const response = await fetch(`${serverUrl}/api/agent/chat`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            prompt,
+            conversationId: conversation._id,
+            agent: selectedAgent,
+            stream: true
+          }),
+          credentials: "include"
+        });
 
-formData.append(
-    "agent",
-    selectedAgent
-);
+        if (!response.ok) {
+          throw new Error(`Streaming failed: ${response.statusText}`);
+        }
 
-if(selectedFile){
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
 
-    formData.append(
-        "file",
-        selectedFile
-    );
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
 
-}
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop(); // keep partial line in buffer
 
-setSelectedFile(null)
+          for (const line of lines) {
+            const cleanLine = line.trim();
+            if (!cleanLine.startsWith("data: ")) continue;
 
-      const data = await sendPrompt(formData);
-    console.log(data)
-     dispatch(
-  addMessage({
-    role: "assistant",
-    content: data.answer,
-    images:data.images
-  })
-);
+            const dataStr = cleanLine.substring(6);
+            if (dataStr === "[DONE]") break;
 
-console.log(data)
-
-if(data.artifacts){
-  dispatch(
-    setArtifacts(
-      data.artifacts
-    )
-  );
-}}
+            try {
+              const parsed = JSON.parse(dataStr);
+              if (parsed.chunk) {
+                dispatch(appendMessageChunk(parsed.chunk));
+              }
+            } catch (err) {
+              console.error("Error parsing chunk:", err);
+            }
+          }
+        }
+      }
+    }
 catch(error){
 
   setBanner({
@@ -265,290 +291,169 @@ catch(error){
   };
 
   return (
-   <div className="w-full overflow-hidden px-3 md:px-5 py-4 border-t border-white/[0.06] bg-[#0d0f14]">
-      <div className="flex flex-col gap-2 bg-white/[0.03] border border-white/[0.07] rounded-2xl px-4 pt-3.5 pb-3">
-
-
-    <div className="flex w-[80%] gap-2 pr-2 flex-wrap">
-
-    {agents.map((agent) => {
-
-      const Icon = agent.icon;
-      const isActive = selectedAgent === agent.id;
-
-      return (
-
-        <button
-          key={agent.id}
-          onClick={() => setSelectedAgent(agent.id)}
-          className={`
-            flex-shrink-0
-            
-            inline-flex
-            items-center
-            gap-1.5
-            px-3
-            py-2
-            rounded-full
-            text-xs
-            font-medium
-            border
-            transition-all
-
-            ${
-              isActive
-                ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white border-transparent shadow-[0_1px_8px_rgba(99,102,241,.35)]"
-                : "bg-white/[0.03] text-slate-400 border-white/[0.06] hover:bg-white/[0.07]"
-            }
-          `}
-        >
-
-          <Icon
-            size={14}
-            className={
-              isActive
-                ? "text-white"
-                : "text-slate-500"
-            }
-          />
-
-          {agent.label}
-
-        </button>
-
-      );
-
-    })}
-
-
-</div>
-
-{
-
-selectedFile && (
-
-<div className="my-3">
-
-<div className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2">
-
-{
-
-selectedFile.type==="application/pdf"
-
-?
-
-<FileText
-
-size={16}
-
-className="text-red-400"
-
-/>
-
-:
-
-
-
-selectedFile?.type.startsWith("image/")
-
-&&
-
-<img
-
-src={URL.createObjectURL(selectedFile)}
-
-className="h-10 w-10 rounded-xl object-cover mt-3"
-
-/>
-
-
-
-}
-
-<div>
-
-<p className="text-xs text-white">
-
-{
-
-selectedFile.name
-
-}
-
-</p>
-
-<p className="text-[10px] text-slate-500">
-
-{
-
-Math.ceil(
-
-selectedFile.size/
-
-1024
-
-)
-
-}
-
-KB
-
-</p>
-
-</div>
-
-<button
-
-onClick={()=>{
-
-setSelectedFile(null);
-
-fileRef.current.value="";
-
-}}
-
-className="ml-2"
-
->
-
-<X
-
-size={14}
-
-className="text-slate-500 hover:text-white"
-
-/>
-
-</button>
-
-</div>
-
-</div>
-
-)
-}
-
+    <div className="w-full overflow-hidden px-4 md:px-6 py-3 border-t border-white/[0.04] bg-[#090b0f] relative z-20">
+      <div 
+        className={`flex flex-col gap-2 bg-[#11131a]/85 border rounded-2xl px-4 pt-3 pb-2.5 shadow-xl transition-all duration-300 
+          ${
+            isListening 
+              ? "border-rose-500/50 shadow-[0_0_25px_rgba(244,63,94,0.15)] bg-[#141115]" 
+              : "border-white/[0.06] focus-within:border-indigo-500/40 focus-within:shadow-[0_0_25px_rgba(99,102,241,0.1)] focus-within:bg-[#12141d]"
+          }`}
+      >
+        {/* Agent Capsules */}
+        <div className="flex w-full gap-1.5 pr-2 flex-wrap items-center">
+          {agents.map((agent) => {
+            const Icon = agent.icon;
+            const isActive = selectedAgent === agent.id;
+            return (
+              <button
+                key={agent.id}
+                onClick={() => setSelectedAgent(agent.id)}
+                className={`
+                  flex-shrink-0
+                  inline-flex
+                  items-center
+                  gap-1.5
+                  px-3
+                  py-1
+                  rounded-full
+                  text-[10.5px]
+                  font-bold
+                  border
+                  transition-all
+                  duration-250
+                  hover:scale-[1.04]
+                  active:scale-[0.97]
+                  cursor-pointer
+                  tracking-wide
+                  ${
+                    isActive
+                      ? "bg-gradient-to-r from-indigo-500 via-violet-500 to-purple-600 text-white border-transparent shadow-[0_2px_12px_rgba(99,102,241,0.35)]"
+                      : "bg-white/[0.02] text-slate-400 border-white/[0.05] hover:bg-white/[0.06] hover:text-slate-200"
+                  }
+                `}
+              >
+                <Icon
+                  size={11}
+                  className={isActive ? "text-white" : "text-slate-500"}
+                />
+                {agent.label}
+                {isActive && (
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shadow-[0_0_8px_#34d399] ml-0.5" />
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Selected file preview */}
+        {selectedFile && (
+          <div className="my-0.5">
+            <div className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-1.5">
+              {selectedFile.type === "application/pdf" ? (
+                <FileText size={14} className="text-red-400" />
+              ) : selectedFile?.type.startsWith("image/") ? (
+                <img
+                  src={URL.createObjectURL(selectedFile)}
+                  className="h-8 w-8 rounded-lg object-cover"
+                />
+              ) : null}
+              <div>
+                <p className="text-[11px] text-white">{selectedFile.name}</p>
+                <p className="text-[9px] text-slate-500">{Math.ceil(selectedFile.size / 1024)} KB</p>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedFile(null);
+                  fileRef.current.value = "";
+                }}
+                className="ml-1.5 cursor-pointer"
+              >
+                <X size={12} className="text-slate-500 hover:text-white" />
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Textarea */}
         <textarea
           value={value}
           onChange={e => setValue(e.target.value)}
-          placeholder={
-placeholders[selectedAgent]
-}
-          rows={3}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              handleSend();
+            }
+          }}
+          placeholder={placeholders[selectedAgent]}
+          rows={2}
           disabled={isLoading}
-          className="w-full bg-transparent outline-none resize-none text-[14px] text-slate-200 placeholder:text-slate-600 leading-relaxed [scrollbar-width:none] [&::-webkit-scrollbar]:hidden disabled:opacity-50"
+          className="w-full bg-transparent outline-none resize-none text-[13px] text-slate-100 placeholder:text-slate-500 leading-relaxed [scrollbar-width:none] [&::-webkit-scrollbar]:hidden disabled:opacity-50 py-0.5 mt-0.5"
         />
 
         {/* Bottom row */}
-        <div className="flex items-center justify-between">
-
+        <div className="flex items-center justify-between border-t border-white/[0.04] pt-2">
           {/* Left — attach + mic */}
-          <div className="flex items-center gap-1">
-  <input
-
-ref={fileRef}
-
-type="file"
-
-hidden
-
-accept=".pdf,image/*"
-
-onChange={(e)=>{
-
-const file =
-e.target.files[0];
-
-if(file){
-
-setSelectedFile(file);
-
-}
-
-}}
-
-/>
-            <button className="flex items-center justify-center w-8 h-8 rounded-lg text-slate-600 hover:text-slate-400 hover:bg-white/[0.05] border border-transparent hover:border-white/[0.06] transition-all duration-150 bg-transparent cursor-pointer"
-            onClick={()=>
-fileRef.current.click()
-}
+          <div className="flex items-center gap-2">
+            <input
+              ref={fileRef}
+              type="file"
+              hidden
+              accept=".pdf,image/*"
+              onChange={(e) => {
+                const file = e.target.files[0];
+                if (file) {
+                  setSelectedFile(file);
+                }
+              }}
+            />
+            
+            <button 
+              className="flex items-center justify-center w-8 h-8 rounded-xl text-slate-400 hover:text-slate-200 hover:bg-white/[0.05] border border-white/[0.06] hover:border-white/[0.12] transition-all duration-150 bg-transparent cursor-pointer shadow-sm"
+              onClick={() => fileRef.current.click()}
             >
-              <Paperclip size={14} />
+              <Paperclip size={13} />
             </button>
-           <button
-
-onClick={toggleMic}
-
-className={`
-
-flex
-
-items-center
-
-justify-center
-
-w-8
-
-h-8
-
-rounded-lg
-
-transition-all
-
-cursor-pointer
-
-${
-
-isListening
-
-?
-
-"bg-red-500 text-white"
-
-:
-
-"text-slate-600 hover:bg-white/[0.05]"
-
-}
-
-`}
-
->
-
-{
-
-isListening
-
-?
-
-<MicOff size={14}/>
-
-:
-
-<Mic size={14}/>
-
-}
-
-</button>
+            
+            <button
+              onClick={toggleMic}
+              className={`
+                flex
+                items-center
+                justify-center
+                w-8
+                h-8
+                rounded-xl
+                border
+                transition-all
+                duration-150
+                cursor-pointer
+                shadow-sm
+                ${
+                  isListening
+                    ? "bg-rose-500 text-white border-transparent animate-pulse"
+                    : "text-slate-400 border-white/[0.06] hover:border-white/[0.12] hover:bg-white/[0.05] hover:text-slate-200"
+                }
+              `}
+            >
+              {isListening ? <MicOff size={13} /> : <Mic size={13} />}
+            </button>
           </div>
 
           {/* Right — send / stop */}
           <button
             onClick={handleSend}
             disabled={!isLoading && !value.trim()}
-            className={`flex items-center justify-center w-8 h-8 rounded-lg border-none cursor-pointer transition-all duration-150
+            className={`flex items-center justify-center w-9 h-9 rounded-xl border-none cursor-pointer transition-all duration-200 hover:scale-[1.05] active:scale-[0.95] shadow-lg
               ${isLoading
-                ? "bg-white text-[#0d0f14] hover:bg-slate-200"
+                ? "bg-white text-[#0d0f14] hover:bg-slate-100"
                 : value.trim()
-                ? "bg-gradient-to-br from-indigo-500 to-violet-700 hover:opacity-90 text-white"
-                : "bg-white/[0.05] text-slate-600 cursor-not-allowed"
+                ? "bg-gradient-to-br from-indigo-500 via-violet-500 to-purple-600 text-white shadow-[0_2px_12px_rgba(99,102,241,0.35)]"
+                : "bg-white/[0.03] text-slate-600 border border-white/[0.04] cursor-not-allowed shadow-none"
               }`}
           >
-            {isLoading ? <Square size={12} fill="currentColor" /> : <Send size={14} />}
+            {isLoading ? <Square size={11} fill="currentColor" /> : <Send size={13} />}
           </button>
-
         </div>
       </div>
 

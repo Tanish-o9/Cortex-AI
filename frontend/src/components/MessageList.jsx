@@ -5,6 +5,7 @@ import { getMessages } from "../features/message.api";
 import { setArtifacts, setMessages } from "../redux/message.slice";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
+import Globe3D from "./Globe3D";
 function NeuralPulse() {
   return (
     <div className="relative w-9 h-9 flex items-center justify-center shrink-0">
@@ -133,6 +134,7 @@ if (latestArtifactMessage) {
     <div className="flex-1 overflow-y-auto px-6 py-6 space-y-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       {messages.length === 0 && !isLoading ? (
         <div className="h-full flex flex-col items-center justify-center gap-4 text-center">
+          <Globe3D />
           <div className="flex flex-col gap-1.5">
             <h1 className="text-[20px] font-semibold text-slate-200 tracking-tight">CortexAI</h1>
             <h3 className="text-[15px] font-semibold text-slate-400 tracking-tight">How can I help you?</h3>

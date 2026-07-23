@@ -22,6 +22,12 @@ export const messageSlice = createSlice({
    state.messages.push(action.payload);
 
   },
+   appendMessageChunk:(state,action)=>{
+     const last = state.messages[state.messages.length - 1];
+     if (last && last.role === "assistant") {
+       last.content += action.payload;
+     }
+   },
    setIsLoading:(state,action)=>{
 
    state.isLoading=action.payload;
@@ -35,6 +41,6 @@ export const messageSlice = createSlice({
 })
 
 // Action creators are generated for each case reducer function
-export const {setMessages,addMessage,setIsLoading,setArtifacts} = messageSlice.actions
+export const {setMessages,addMessage,appendMessageChunk,setIsLoading,setArtifacts} = messageSlice.actions
 
 export default messageSlice.reducer

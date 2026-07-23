@@ -34,6 +34,10 @@
     "pdf-parse": "^2.4.5",
     "pdfkit": "^0.19.1",
     "pptxgenjs": "^4.0.1",
-    "tavily": "^2.0.0"
+    "tavily": "^2.0.0",
+    "pg": "^8.11.5",
+    "node-cron": "^3.0.3",
+    "@octokit/rest": "^20.0.2",
+    "winston": "^3.11.0"
   }
 }

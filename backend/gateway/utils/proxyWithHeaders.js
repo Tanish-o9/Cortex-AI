@@ -1,38 +1,21 @@
-import proxy from "express-http-proxy";
+import { createProxyMiddleware } from "http-proxy-middleware";
 
-export const proxyWithUser =
-(serviceUrl)=>{
-
- return proxy(
-  serviceUrl,
-  {
-
-   proxyReqOptDecorator:
-   (proxyReqOpts, srcReq)=>{
-
-    if(srcReq.user){
-
-      proxyReqOpts.headers[
-       "x-user-id"
-      ] =
-      srcReq.user.userId;
-
-      proxyReqOpts.headers[
-       "x-user-email"
-      ] =
-      srcReq.user.email;
-      proxyReqOpts.headers[
-       "x-user-avatar"
-      ] =
-      srcReq.user.avatar
-
+/**
+ * Custom proxy middleware that forwards user details inside headers.
+ */
+export const proxyWithUser = (serviceUrl, targetPath = null) => {
+  return createProxyMiddleware({
+    target: serviceUrl,
+    changeOrigin: true,
+    pathRewrite: targetPath ? () => targetPath : null,
+    on: {
+      proxyReq: (proxyReq, req, res) => {
+        if (req.user) {
+          proxyReq.setHeader("x-user-id", String(req.user.userId || req.user.uid || ""));
+          proxyReq.setHeader("x-user-email", String(req.user.email || ""));
+          proxyReq.setHeader("x-user-avatar", String(req.user.avatar || ""));
+        }
+      }
     }
-
-    return proxyReqOpts;
-
-   }
-
-  }
- );
-
-}
+  });
+};

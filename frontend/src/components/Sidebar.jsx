@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { Plus, MessageSquare, Settings, LogOut, User, PenSquare, Menu, X, Coins, ConeIcon, CoinsIcon } from "lucide-react";
+import { Plus, MessageSquare, Settings, LogOut, User, PenSquare, Menu, X, Coins, ConeIcon, CoinsIcon, BarChart2, Terminal, Database, Activity, Cpu, ShieldAlert } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import api from "../utils/axios";
-import { setUserData } from "../redux/user.slice";
+import { setUserData, setCurrentView } from "../redux/user.slice";
 import { createConversation, getConversations } from "../features/conversation.api";
 import { addConversation, setConversations, setSelectedConversation } from "../redux/conversation.slice";
 import { getMessages } from "../features/message.api";
@@ -144,6 +144,35 @@ const [showBilling, setShowBilling] =useState(false);
         </button>
       </div>
 
+      {/* Navigation Tabs */}
+      <div className="px-3.5 pt-3 pb-3 flex flex-col gap-1 border-b border-white/[0.04]">
+        {[
+          { id: "chat", label: "AI Agent Chat", icon: MessageSquare },
+          { id: "workflows", label: "Visual Workflows", icon: Plus },
+          { id: "aios", label: "AI OS Mode", icon: Cpu },
+          { id: "enterprise", label: "Enterprise Hub", icon: ShieldAlert },
+          { id: "marketplace", label: "Marketplace", icon: Settings },
+          { id: "knowledge", label: "Knowledge Base", icon: Database },
+          { id: "dashboard", label: "Realtime Stats", icon: Activity },
+          { id: "playground", label: "API Playground", icon: Terminal }
+        ].map(item => {
+          const { currentView } = useSelector(state => state.user);
+          const isActive = currentView === item.id;
+          return (
+            <button
+              key={item.id}
+              onClick={() => dispatch(setCurrentView(item.id))}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-xs font-bold border-none cursor-pointer transition-all duration-150 ${
+                isActive ? "bg-indigo-500/10 text-indigo-400" : "bg-transparent text-slate-300 hover:bg-white/[0.04] hover:text-slate-200"
+              }`}
+            >
+              <item.icon size={14} />
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+
       {/* New Chat */}
       <div className="px-4 pt-4 pb-1">
         <button
@@ -157,18 +186,15 @@ const [showBilling, setShowBilling] =useState(false);
 
       {
         conversations.length==0? (
-        
-            <div className="px-5 pt-4 pb-1.5 text-[10.5px] font-semibold uppercase tracking-widest text-slate-600">
+            <div className="px-5 pt-4 pb-1.5 text-[10.5px] font-bold uppercase tracking-widest text-slate-500">
                  No recent conversations
             </div>
           )
         :
         (
-             
- <p className="px-5 pt-4 pb-1.5 text-[10.5px] font-semibold uppercase tracking-widest text-slate-600">
-        Recents
-      </p>
-
+          <p className="px-5 pt-4 pb-1.5 text-[10.5px] font-bold uppercase tracking-widest text-slate-500">
+            Recents
+          </p>
         )
       }
 
@@ -194,7 +220,7 @@ const [showBilling, setShowBilling] =useState(false);
                 ${isActive ? "bg-indigo-500/15 text-indigo-400" : "bg-white/[0.05] text-slate-500"}`}>
                 <MessageSquare size={13} />
               </div>
-              <p className={`text-[13px] font-medium truncate ${isActive ? "text-slate-100" : "text-slate-300"}`}>
+              <p className={`text-[13px] font-bold truncate ${isActive ? "text-slate-100" : "text-slate-300"}`}>
                 {chat.title}
               </p>
             </div>
@@ -227,7 +253,7 @@ const [showBilling, setShowBilling] =useState(false);
               <span className="absolute -bottom-px -right-px w-[9px] h-[9px] bg-green-500 rounded-full border-2 border-[#0d0f14] block" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[13.5px] font-semibold text-slate-100 truncate">{userData.name}</p>
+              <p className="text-[13.5px] font-bold text-slate-100 truncate">{userData.name}</p>
               <p className="text-[11px] text-slate-600 mt-px">{userData.plan || "Free Plan"}</p>
             </div>
             <div className="flex gap-1">
@@ -277,8 +303,8 @@ const [showBilling, setShowBilling] =useState(false);
       {/* ── Sidebar panel ── */}
       <div className={`
         fixed lg:static inset-y-0 left-0 z-50
-        w-[270px] h-screen shrink-0
-        bg-[#0d0f14] border-r border-white/[0.06]
+        w-[270px] h-full shrink-0
+        bg-[#0d0f14]
         transition-transform duration-250
         ${mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}
       `}>

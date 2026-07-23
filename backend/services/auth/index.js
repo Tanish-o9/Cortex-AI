@@ -3,6 +3,7 @@ import cors from "cors";
 import connectDB from "./config/db.js";
 import dotenv from "dotenv";
 import router from "./routes/auth.routes.js";
+import orgRouter from "./routes/org.routes.js";
 dotenv.config();
 const app = express();
 app.use(express.json());
@@ -17,6 +18,7 @@ app.get("/", (req, res) => {
   });
 });
 app.use("/",router)
+app.use("/",orgRouter)
 app.listen(port, () => {
     connectDB()
   console.log(

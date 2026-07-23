@@ -2,6 +2,7 @@ import express from "express";
 import dotenv from "dotenv";
 import connectDB from "./config/db.js";
 import router from "./routes/agent.route.js";
+import { startAutonomousGoalExecutor } from "./utils/autonomousGoalExecutor.js";
 dotenv.config();
 const app = express();
 app.use(express.json());
@@ -34,7 +35,8 @@ app.use((err, req, res, next) => {
 });
 
 app.listen(port, () => {
-    connectDB()
+  connectDB();
+  startAutonomousGoalExecutor();
   console.log(
     `agent service running on ${port}`
   );

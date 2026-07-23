@@ -1,0 +1,215 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cortex-ai
+---
+# MongoDB StatefulSet
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb
+  namespace: cortex-ai
+spec:
+  serviceName: mongodb
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongodb
+  template:
+    metadata:
+      labels:
+        app: mongodb
+    spec:
+      containers:
+      - name: mongodb
+        image: mongo:latest
+        ports:
+        - containerPort: 27017
+        volumeMounts:
+        - name: mongo-persistent-storage
+          mountPath: /data/db
+  volumeClaimTemplates:
+  - metadata:
+      name: mongo-persistent-storage
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      resources:
+        requests:
+          storage: 10Gi
+---
+# MongoDB Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb
+  namespace: cortex-ai
+spec:
+  ports:
+  - port: 27017
+  selector:
+    app: mongodb
+---
+# PostgreSQL Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: cortex-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        env:
+        - name: POSTGRES_DB
+          value: cortex_db
+        - name: POSTGRES_USER
+          value: cortex_user
+        - name: POSTGRES_PASSWORD
+          value: cortex_password
+        ports:
+        - containerPort: 5432
+---
+# PostgreSQL Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: cortex-ai
+spec:
+  ports:
+  - port: 5432
+  selector:
+    app: postgres
+---
+# Redis Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: cortex-ai
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:alpine
+        ports:
+        - containerPort: 6379
+---
+# Redis Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: cortex-ai
+spec:
+  ports:
+  - port: 6379
+  selector:
+    app: redis
+---
+# API Gateway Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: cortex-ai
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+      - name: api-gateway
+        image: cortex-api-gateway:latest
+        env:
+        - name: PORT
+          value: "8000"
+        - name: REDIS_URL
+          value: "redis://redis:6379"
+        - name: AUTH_SERVICE
+          value: "http://auth-service:8001"
+        - name: CHAT_SERVICE
+          value: "http://chat-service:8002"
+        - name: AGENT_SERVICE
+          value: "http://agent-service:8003"
+        - name: BILLING_SERVICE
+          value: "http://billing-service:8004"
+        ports:
+        - containerPort: 8000
+---
+# API Gateway Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: cortex-ai
+spec:
+  type: LoadBalancer
+  ports:
+  - port: 80
+    targetPort: 8000
+  selector:
+    app: api-gateway
+---
+# Auth Service Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-service
+  namespace: cortex-ai
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: auth-service
+  template:
+    metadata:
+      labels:
+        app: auth-service
+    spec:
+      containers:
+      - name: auth-service
+        image: cortex-auth-service:latest
+        env:
+        - name: PORT
+          value: "8001"
+        - name: MONGODB_URL
+          value: "mongodb://mongodb:27017/cortex_auth"
+        - name: POSTGRES_URL
+          value: "postgresql://cortex_user:cortex_password@postgres:5432/cortex_db"
+        ports:
+        - containerPort: 8001
+---
+# Auth Service LoadBalancer
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-service
+  namespace: cortex-ai
+spec:
+  ports:
+  - port: 8001
+  selector:
+    app: auth-service
